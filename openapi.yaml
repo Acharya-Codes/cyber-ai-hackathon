@@ -1,0 +1,120 @@
+openapi: 3.1.0
+info:
+  title: BitsnBytes Alert Scoring API
+  version: 1.0.0
+  description: >
+    Shared integration contract for the alert-scoring service. The data
+    definitions and units for the four input features must be confirmed by the
+    Data Engineer and Lead ML Engineer before they are treated as final.
+servers:
+  - url: http://localhost:8000
+    description: Local development
+paths:
+  /health:
+    get:
+      summary: Check whether the service is online
+      responses:
+        "200":
+          description: Service is online
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    const: online
+              example:
+                status: online
+  /score_alert:
+    post:
+      summary: Score an alert
+      description: >
+        Critical is assigned when the model's probability for anomaly class 1
+        is at least 0.5; otherwise severity is Low. Confirm this class mapping
+        and threshold with the Lead ML Engineer and Security SME.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertFeatures"
+            example:
+              failed_logins: 5
+              location_deviation: 0.8
+              time_deviation: 0.4
+              snort_flag: 1
+      responses:
+        "200":
+          description: Alert scored successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertScore"
+              example:
+                status: success
+                severity: Critical
+                ai_confidence_score: 0.93
+                timestamp: "2026-10-09T04:45:00+00:00"
+        "422":
+          description: Request body is missing required fields or has invalid field types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: array
+                    items:
+                      type: object
+components:
+  schemas:
+    AlertFeatures:
+      type: object
+      required:
+        - failed_logins
+        - location_deviation
+        - time_deviation
+        - snort_flag
+      properties:
+        failed_logins:
+          type: integer
+          description: Definition and measurement window to be confirmed by the team.
+        location_deviation:
+          type: number
+          format: float
+          description: Definition, scale, and units to be confirmed by the team.
+        time_deviation:
+          type: number
+          format: float
+          description: Definition, scale, and units to be confirmed by the team.
+        snort_flag:
+          type: integer
+          description: Snort indicator encoding to be confirmed by the team.
+    AlertScore:
+      type: object
+      required:
+        - status
+        - severity
+        - ai_confidence_score
+        - timestamp
+      properties:
+        status:
+          type: string
+          const: success
+        severity:
+          type: string
+          enum:
+            - Critical
+            - Low
+        ai_confidence_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Model probability assigned to anomaly class 1.
+        timestamp:
+          type: string
+          format: date-time
